@@ -1,6 +1,7 @@
 package me.desht.modularrouters.block;
 
 import me.desht.modularrouters.block.tile.ICamouflageable;
+import me.desht.modularrouters.util.RunShallow;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.player.PlayerEntity;
@@ -16,6 +17,7 @@ import net.minecraftforge.client.model.data.ModelProperty;
 import net.minecraftforge.common.ToolType;
 
 import javax.annotation.Nullable;
+import java.util.AbstractMap;
 
 //@Optional.Interface (iface = "team.chisel.ctm.api.IFacade", modid = "ctm-api")
 public abstract class BlockCamo extends Block /*implements IFacade*/ {
@@ -38,10 +40,18 @@ public abstract class BlockCamo extends Block /*implements IFacade*/ {
         return camo == null ? getUncamouflagedShape(state, reader, pos, ctx) : camo.getCamouflage().getShape(reader, pos, ctx);
     }
 
+    // FIXME: use proper Pair instead of AbstractMap.SimpleImmutableEntry
+    final private RunShallow<AbstractMap.SimpleImmutableEntry<IBlockReader, BlockPos>> running = new RunShallow<>();
+
     @Override
     public int getLightValue(BlockState state, IBlockReader world, BlockPos pos) {
-        ICamouflageable camo = getCamoState(world, pos);
-        return camo == null || !camo.extendedMimic() || isBlacklisted(camo.getCamouflage()) ? super.getLightValue(state, world, pos) : camo.getCamouflage().getLightValue(world, pos);
+        return running.<Integer>run(
+                new AbstractMap.SimpleImmutableEntry<>(world, pos),
+                k -> super.getLightValue(state, world, pos),
+                k -> {
+                    ICamouflageable camo = getCamoState(world, pos);
+                    return camo == null || !camo.extendedMimic() ? super.getLightValue(state, world, pos) : camo.getCamouflage().getLightValue(world, pos);
+                });
     }
 
     @Override
@@ -142,11 +152,11 @@ public abstract class BlockCamo extends Block /*implements IFacade*/ {
         return VoxelShapes.empty();
     }
 
-    private boolean isBlacklisted(BlockState camouflage) {
-        // C&B chiseled blocks also have some camo functionality, and this can cause a recursive loop
-        // https://github.com/desht/ModularRouters/issues/116
-        return camouflage.getBlock().getRegistryName().toString().startsWith("chiselsandbits:chiseled_");
-    }
+//    private boolean isBlacklisted(BlockState camouflage) {
+//        // C&B chiseled blocks also have some camo functionality, and this can cause a recursive loop
+//        // https://github.com/desht/ModularRouters/issues/116
+//        return camouflage.getBlock().getRegistryName().toString().startsWith("chiselsandbits:chiseled_");
+//    }
 
 //    @Nonnull
 //    @Override
